@@ -29,8 +29,8 @@ def linear_splines_var(data, num_knots, level_width):
     p_0 = np.linspace(0,98,num_knots).astype(int)
     p_0 = np.hstack([data[p_0], p_0])
     try:
-        fit, _ = optimize.curve_fit(lambda x, *params : linear_splines(x, num_knots, params),
-                                np.linspace(1,99,99), data, p_0)
+        fit, _ = optimize.curve_fit(lambda x, *params : linear_splines(x, num_knots, params), 
+                np.linspace(1,99,99), data, p_0)
         levels = np.linspace(1,99,99)
         levels = levels[level_width-1::level_width]
         return np.interp(levels, fit[num_knots:], fit[:num_knots])
@@ -71,21 +71,15 @@ precip_levels_approx_var = np.zeros(shape=(int(np.floor(100/level_width)),)+lat.
 #     pool.close()
 #     pool.join()
 
-global count
-count = 0
-
 def wrap(element):
     i = int(np.floor(element/lat.shape[1]))
     j = int(element % lat.shape[1])
     precip_levels_approx_var[:,i,j] = linear_splines_var(precip_levels_flat[:,element],10,30)
-    count += 1
-    if count in [100000,500000,1000000,1500000,2000000,2500000,3000000,3500000]:
-        print(f'{count} out of {lat.shape[0]*lat.shape[1]} iterations completed.')
 
 start_time = time.time()
 
 if __name__ == '__main__':
-    pool = mp.Pool(processes = 16)
+    pool = mp.Pool(processes = mp.cpu_count())
     pool.map_async(wrap, list(range(lat.shape[0]*lat.shape[1])))
     pool.close()
     pool.join()
