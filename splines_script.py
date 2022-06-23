@@ -53,7 +53,6 @@ for element in range(lat.shape[0]*lat.shape[1]):
     j = int(element % lat.shape[1])
     precip_levels_flat[:,element] = precip_levels[:,i,j]
 
-count = [0,0,0]
 level_width = 30
 global precip_levels_approx_var
 precip_levels_approx_var = np.zeros(shape=(int(np.floor(100/level_width)),)+lat.shape)
