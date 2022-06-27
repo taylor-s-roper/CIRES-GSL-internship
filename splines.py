@@ -35,20 +35,15 @@ def linear_splines(x, num_knots, *params):
     knots = list(params[0][num_knots:])
     return np.interp(x, knots, knot_vals)
 
-def linear_splines_var(data, num_knots, level_width, all=True):
+def linear_splines_var(data, num_knots, level_width):
     '''
     Calculates piecewise linear splines for quantile data using specified number of
     knots with optimized placement and returning interpolated approximation at every
     quantile level with level_width.
     '''
-    print(data.shape)
-    if not all:
-        if data[49] == 0:
-            return linear_splines_unif(data, num_knots=num_knots, level_width=level_width) 
-
-    # checking if cdf is all zero
-    if data[-1] == 0:
-        return np.zeros(int(np.floor(100/level_width)))
+#     checking if cdf is all zero
+#     if data[-1] == 0:
+#         return np.zeros(int(np.floor(100/level_width)))
 
     # setting up intial value of parameters
     p_0 = np.linspace(0,98,num_knots).astype(int)
@@ -65,14 +60,6 @@ def linear_splines_var(data, num_knots, level_width, all=True):
     except RuntimeError:
         return linear_splines_unif(data, num_knots=num_knots, level_width=level_width)
 
-# wrapper function of linear_splines_var for numpy.apply_over_axes
-def wrapper_func(data, axis):
-    num_knots = 10
-    level_width = 30
-    all = False
-    return linear_splines_var(data, num_knots, level_width, all)
-
-
 # read in grib file
 fn_grb = 'blend.t00z.qmd.f012.co.grib2'
 ds_grb = pygrib.open(fn_grb)
@@ -82,39 +69,45 @@ lat, long = ds_grb.message(2).data()[1:]
 
 # extracting precipitation levels for 6 hr forecast
 precip_shape = lat.shape
+global precip_levels
 precip_levels = np.zeros(shape=(99,)+precip_shape)
 for i in range(99):
     precip_levels[i,:,:] = ds_grb.message(i+2).data()[0]
 
+global nonzero_idx
+nonzero_idx = np.where(precip_levels[-1,:,:] != 0)
+
 # flattening precip_levels
 # global precip_levels_flat
-precip_levels_flat = np.zeros(shape=(99,lat.shape[0]*lat.shape[1]))
+# precip_levels_flat = np.zeros(shape=(99,lat.shape[0]*lat.shape[1]))
 
-for element in range(lat.shape[0]*lat.shape[1]):
-    i = int(np.floor(element/lat.shape[1]))
-    j = int(element % lat.shape[1])
-    precip_levels_flat[:,element] = precip_levels[:,i,j]
-
-# initializing output 
-# global precip_levels_approx_var
-# precip_levels_approx_var = np.zeros(shape=(int(np.floor(100/level_width)),)+lat.shape)
-
-# parallel code using multiprocessing - doesn't speed up code though!
-# def wrap(element):
+# for element in range(lat.shape[0]*lat.shape[1]):
 #     i = int(np.floor(element/lat.shape[1]))
 #     j = int(element % lat.shape[1])
-#     precip_levels_approx_var[:,i,j] = linear_splines_var(precip_levels_flat[:,element],10,30)
+#     precip_levels_flat[:,element] = precip_levels[:,i,j]
 
-# if __name__ == '__main__':
-#     pool = mp.Pool(processes = mp.cpu_count())
-#     pool.map_async(wrap, list(range(lat.shape[0]*lat.shape[1])))
-#     pool.close()
-#     pool.join()
+# initializing output
+level_width = 30
+num_knots = 10
+global precip_levels_approx_var
+precip_levels_approx_var = np.zeros(shape=(int(np.floor(100/level_width)),)+lat.shape)
 
 start_time = time.time()
 
-# applying linear_splines_var to every grid point
-precip_levels_approx_var = np.apply_over_axes(wrapper_func, precip_levels_flat, 0)
+# parallel code using multiprocessing - doesn't seem to speed up code with 8 cores though!
+def wrap(n):
+    i = nonzero_idx[0][n]
+    j = nonzero_idx[1][n]
+    precip_levels_approx_var[:,i,j] = linear_splines_var(precip_levels[:,i,j], num_knots, level_width)
+
+if __name__ == '__main__':
+    if mp.cpu_count() > 16:
+        pool = mp.Pool(processes = mp.cpu_count()-16)
+    else:
+        pool = mp.Pool(processes = np.cpu_count())
+    pool.map_async(wrap, list(range(nonzero_idx[0].shape[0])))
+    pool.close()
+    pool.join()
 
 end_time = time.time()
 print(f'Linear spline code took {end_time - start_time} to run.')
