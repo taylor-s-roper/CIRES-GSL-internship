@@ -74,31 +74,21 @@ precip_levels = np.zeros(shape=(99,)+precip_shape)
 for i in range(99):
     precip_levels[i,:,:] = ds_grb.message(i+2).data()[0]
 
+# initializing output
+level_width = 30 # level_width defined here, but any updates should be manually made in wrap function
+global precip_levels_approx_var
+precip_levels_approx_var = np.zeros(shape=(int(np.floor(100/level_width)),)+lat.shape)
 global nonzero_idx
 nonzero_idx = np.where(precip_levels[-1,:,:] != 0)
 
-# flattening precip_levels
-# global precip_levels_flat
-# precip_levels_flat = np.zeros(shape=(99,lat.shape[0]*lat.shape[1]))
-
-# for element in range(lat.shape[0]*lat.shape[1]):
-#     i = int(np.floor(element/lat.shape[1]))
-#     j = int(element % lat.shape[1])
-#     precip_levels_flat[:,element] = precip_levels[:,i,j]
-
-# initializing output
-level_width = 30
-num_knots = 10
-global precip_levels_approx_var
-precip_levels_approx_var = np.zeros(shape=(int(np.floor(100/level_width)),)+lat.shape)
-
-start_time = time.time()
-
-# parallel code using multiprocessing - doesn't seem to speed up code with 8 cores though!
+# wrapped function for parallel processing
 def wrap(n):
     i = nonzero_idx[0][n]
     j = nonzero_idx[1][n]
-    precip_levels_approx_var[:,i,j] = linear_splines_var(precip_levels[:,i,j], num_knots, level_width)
+    precip_levels_approx_var[:,i,j] = linear_splines_var(precip_levels[:,i,j], 10, 30)
+
+# parallel code using multiprocessing - doesn't seem to speed up code with 8 cores though!
+start_time = time.time()
 
 if __name__ == '__main__':
     if mp.cpu_count() > 16:
