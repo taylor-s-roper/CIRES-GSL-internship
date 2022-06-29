@@ -85,7 +85,7 @@ nonzero_idx = np.where(precip_levels[-1,:,:] != 0)
 def wrap(n):
     i = nonzero_idx[0][n]
     j = nonzero_idx[1][n]
-    precip_levels_approx_var[:,i,j] = linear_splines_var(precip_levels[:,i,j], 10, 30)
+    precip_levels_approx_var[:,i,j] = linear_splines_var(precip_levels[:,i,j], 10, 30) # 10 = num_knots; 30 = level_width
 
 # parallel code using multiprocessing - doesn't seem to speed up code with 8 cores though!
 start_time = time.time()
