@@ -16,7 +16,7 @@ for i in range(99):
     precip_levels[i,:,:] = ds_grb.message(i+2).data()[0]
 
 precip_levels_approx_unif = np.load('precip_levels_approx_unif.npy')
-precip_levels_approx_var = np.load('precip_levels_approx_var.npy')
+precip_levels_approx_var = np.load('precip_levels_approx_var_.npy')
 
 class Plot:
 
