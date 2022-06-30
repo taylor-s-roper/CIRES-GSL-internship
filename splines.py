@@ -6,19 +6,22 @@ import time
 
 # linear spline functions
 
-def linear_splines_unif(data, num_knots=10, level_width=1):   
+def linear_splines_unif(data, num_knots=10, level_width=1, zero_inflated=True):   
     '''
     Calculates piecewise linear splines for quantile data using specified number of 
     knots uniformly spaced and returning interpolated approximation at every 
     quantile level with level_width.
     ''' 
-
-    # calculating where cdf starts being nonzero (all zero cdf's should not be inputted)
-    levels = np.array(range(1,100))
-    knot_ = np.where(data > 0)[0].min() - 1   
-    if knot_ > 1:
-        knots = np.unique(np.linspace(knot_-1, 98, num_knots-1, dtype=int))
-        knots = np.insert(knots, 0, 0)
+    
+    if zero_inflated:
+        # calculating where cdf starts being nonzero (all zero cdf's should not be inputted)
+        levels = np.array(range(1,100))
+        knot_ = np.where(data > 0)[0].min() - 1   
+        if knot_ > 1:
+            knots = np.unique(np.linspace(knot_-1, 98, num_knots-1, dtype=int))
+            knots = np.insert(knots, 0, 0)
+        else:
+            knots = np.unique(np.linspace(0, 98, num_knots, dtype=int))
     else:
         knots = np.unique(np.linspace(0, 98, num_knots, dtype=int))
         
@@ -35,15 +38,16 @@ def linear_splines(x, num_knots, *params):
     knots = list(params[0][num_knots:])
     return np.interp(x, knots, knot_vals)
 
-def linear_splines_var(data, num_knots, level_width):
+def linear_splines_var(data, num_knots=10, level_width=1, zero_inflated=True):
     '''
     Calculates piecewise linear splines for quantile data using specified number of
     knots with optimized placement and returning interpolated approximation at every
     quantile level with level_width.
     '''
-#     checking if cdf is all zero
-#     if data[-1] == 0:
-#         return np.zeros(int(np.floor(100/level_width)))
+    
+    # checking if cdf is all zero
+    if data[-1] == 0:
+        return np.zeros(int(np.floor(100/level_width)))
 
     # setting up intial value of parameters
     p_0 = np.linspace(0,98,num_knots).astype(int)
@@ -58,7 +62,7 @@ def linear_splines_var(data, num_knots, level_width):
         levels = levels[level_width-1::level_width]
         return np.interp(levels, fit[num_knots:], fit[:num_knots])
     except RuntimeError:
-        return linear_splines_unif(data, num_knots=num_knots, level_width=level_width)
+        return linear_splines_unif(data, num_knots, level_width, zero_inflated)
 
 # read in grib file
 fn_grb = 'blend.t00z.qmd.f012.co.grib2'

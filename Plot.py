@@ -55,12 +55,12 @@ class Plot:
         # draw coastlines, country boundaries, fill continents
         map.drawcoastlines(linewidth=0.25)
         map.drawcountries(linewidth=0.25)
-        map.fillcontinents(color='xkcd:white',lake_color='xkcd:blue')
+        map.fillcontinents(color='xkcd:white',lake_color='xkcd:white')
 
 
 
         # draw the edge of the map projection region (the projection limb)
-        map.drawmapboundary(fill_color='xkcd:blue')
+        map.drawmapboundary(fill_color='xkcd:white')
         map.drawstates()
 
         # draw lat/lon grid lines every 30 degrees.
@@ -82,7 +82,7 @@ class Plot:
             map.colorbar()
             map.colorbar().set_label('mm of precipitation')
         else:
-            map.contour(x, y, data, 16, linewidths=1.5)
+            map.contourf(x, y, data, 16, linewidths=1.5)
 
         plt.title(var_name)
         plt.show()
