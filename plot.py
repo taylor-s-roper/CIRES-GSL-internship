@@ -56,7 +56,7 @@ lat, long = ds_grb.message(2).data()[1:]
 precip_shape = lat.shape
 precip = np.zeros(shape=(99,)+precip_shape)
 for i in range(99):
-    precip[i,:,:] = ds_grb.message(i+2).data()[0] # ACPC:surface:12-18 hour acc fcst
+    precip[i,:,:] = ds_grb.message(i+2).data()[0] 
 ds_grb.close()
 
 precip_unif = np.load('results/precip_unif_' + month, allow_pickle=True)
@@ -65,15 +65,9 @@ errors_unif = np.load('results/errors_unif_' + month, allow_pickle=True)
 errors_var = np.load('results/errors_var_' + month, allow_pickle=True) 
 
 
-def Basemap_plot(data, long, lat, diff=False, name=None, color_label='mm of precipiation'):
+def Basemap_plot(data, long, lat, diff=False, name=None, color_label='mm of precipiation', boundary=None):
                 
-    map = Basemap(llcrnrlon=-123.,llcrnrlat=20., 
-                urcrnrlon=-59., urcrnrlat=48., 
-                projection='lcc', 
-                lat_1=38.5,
-                lat_0=38.5,
-                lon_0=-97.5,
-                resolution='l')
+    map = Basemap(llcrnrlon=-123.,llcrnrlat=20., urcrnrlon=-59., urcrnrlat=48., projection='lcc', lat_1=38.5, lat_0=38.5, lon_0=-97.5, resolution='l')
 
     # draw coastlines, country boundaries, fill continents
     map.drawcoastlines(linewidth=0.25)
@@ -93,11 +87,10 @@ def Basemap_plot(data, long, lat, diff=False, name=None, color_label='mm of prec
     x, y = map(long, lat)
 
     if diff:
-        boundary = int(np.ceil(max(np.abs(data.min()), np.abs(data.max()))))
+        if boundary is None:
+            boundary = int(np.ceil(max(np.abs(data.min()), np.abs(data.max()))))
         levels = list(range(-boundary, boundary+1))
-        plt.pcolormesh(x, y, data,
-                    norm=colors.Normalize(vmin=levels[0], vmax=levels[-1]),
-                    cmap='seismic', shading='nearest')
+        plt.pcolormesh(x, y, data, norm=colors.Normalize(vmin=levels[0], vmax=levels[-1]), cmap='seismic', shading='nearest')
         # map.contourf(x, y, data, 16, levels=levels, cmap='seismic')
         map.colorbar()
         map.colorbar().set_label(color_label)
@@ -113,8 +106,10 @@ def Basemap_plot(data, long, lat, diff=False, name=None, color_label='mm of prec
 
 level_idx = np.where(np.array([5,25,50,75,95]) == level)[0]
 Basemap_plot(data=precip[level-1,:,:], long=long, lat=lat, name=f'Precipitation at {level}% quantile')
-Basemap_plot(data=precip_unif[level-1,:,:]-precip[level-1,:,:], long=long, lat=lat, diff=True, name=f'Uniform node error at {level}% quantile')
-Basemap_plot(data=precip_var[level-1,:,:]-precip[level-1,:,:], long=long, lat=lat, diff=True, name=f'Variable node error at {level}% quantile')
+diff_unif = precip_unif[level_idx,:,:] - precip[level-1,:,:]
+diff_var = precip_var[level_idx,:,:] - precip[level-1,:,:]
+Basemap_plot(data=diff_unif[0], long=long, lat=lat, diff=True, name=f'Uniform node error at {level}% quantile')
+Basemap_plot(data=diff_var[0], long=long, lat=lat, diff=True, name=f'Variable node error at {level}% quantile')
 if plot_errors:
     Basemap_plot(data=errors_unif[0,:,:], long=long, lat=lat, name=f'KS statistic for uniform nodes at {level}% quantile', color_label='KS')
     Basemap_plot(data=errors_unif[1,:,:], long=long, lat=lat, name=f'L_1 norm for uniform nodes at {level}% quantile', color_label='L_1 norm')

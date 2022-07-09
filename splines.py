@@ -1,8 +1,10 @@
 
-approx_type = 'unif' # 'unif', 'var', or 'both'
+approx_type = 'both' # 'unif', 'var', or 'both'
+include_temp = False # does not approximate temperature data yet
 error_calc = True
 save = True
-month = 'wet'
+month = 'march'
+# months completed: wet, jan
 
 import numpy as np
 import pygrib
@@ -56,16 +58,15 @@ lat, long = ds_grb.message(2).data()[1:]
 precip_shape = lat.shape
 precip = np.zeros(shape=(99,)+precip_shape)
 for i in range(99):
-    precip[i,:,:] = ds_grb.message(i+2).data()[0] # ACPC:surface:12-18 hour acc fcst
+    precip[i,:,:] = ds_grb.message(i+2).data()[0] 
 ds_grb.close()
 
-read_temp = False
-if read_temp:
+if include_temp:
     ds_grb = pygrib.open(fn_grb)
     temp_shape = lat.shape
     temp = np.zeros(shape=(99,)+temp_shape)
     for i in range(99):
-        temp[i,:,:] = ds_grb.message(i+215).data()[0] # TMP:2 m above ground:0-18 hour max
+        temp[i,:,:] = ds_grb.message(i+215).data()[0]
     ds_grb.close()
 
 # masking precip at grid points that are not monotonic
@@ -136,8 +137,7 @@ def linear_splines_var(data, num_knots=5, zero_inflated=True):
     # try to fit parameters with RuntimeError exception that returns linear_splines_unif
     # that uses uniformly space knots
     try:
-        fit, _ = optimize.curve_fit(lambda x, *params : linear_splines(x, num_knots, params), 
-                np.linspace(1,99,99), data, p_0)
+        fit, _ = optimize.curve_fit(lambda x, *params : linear_splines(x, num_knots, params), np.linspace(1,99,99), data, p_0)
         levels = range(1,100)
         return np.interp(levels, fit[num_knots:], fit[:num_knots])
     except RuntimeError:
