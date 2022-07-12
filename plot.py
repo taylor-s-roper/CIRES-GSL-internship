@@ -1,6 +1,11 @@
-month = 'wet'
-level = 50
-plot_errors = False
+month = 'july'
+level = 95 # possible levels = [5,25,50,75,95]
+plot_orig = True
+plot_diff = True
+boundary = None
+plot_errors = True
+
+# months completed: jan
 
 import numpy as np
 import pygrib
@@ -24,7 +29,7 @@ elif month == 'april':
     date = '20220425'
     lead_time = '12'
     forecast_time = '018'
-elif month == 'july':
+elif month == 'july03':
     date = '20220703'
     lead_time = '00'
     forecast_time = '018'
@@ -104,16 +109,22 @@ def Basemap_plot(data, long, lat, diff=False, name=None, color_label='mm of prec
         
     plt.show()
 
-level_idx = np.where(np.array([5,25,50,75,95]) == level)[0]
-Basemap_plot(data=precip[level-1,:,:], long=long, lat=lat, name=f'Precipitation at {level}% quantile')
-diff_unif = precip_unif[level_idx,:,:] - precip[level-1,:,:]
-diff_var = precip_var[level_idx,:,:] - precip[level-1,:,:]
-Basemap_plot(data=diff_unif[0], long=long, lat=lat, diff=True, name=f'Uniform node error at {level}% quantile')
-Basemap_plot(data=diff_var[0], long=long, lat=lat, diff=True, name=f'Variable node error at {level}% quantile')
+if plot_orig:
+    Basemap_plot(data=precip[level-1,:,:], long=long, lat=lat, name=f'Precipitation at {level}% quantile')
+
+if plot_diff:
+    level_idx = np.where(np.array([5,25,50,75,95]) == level)[0]
+    diff_unif = (precip_unif[level_idx,:,:] - precip[level-1,:,:])[0]
+    diff_var = (precip_var[level_idx,:,:] - precip[level-1,:,:])[0]
+    if boundary is None:
+        boundary = int(np.ceil(max(np.abs(diff_unif.min()), np.abs(diff_unif.max()), np.abs(diff_var.min()), np.abs(diff_var.max()))))
+    Basemap_plot(data=diff_unif, long=long, lat=lat, diff=True, name=f'Uniform node error at {level}% quantile', boundary=boundary)
+    Basemap_plot(data=diff_var, long=long, lat=lat, diff=True, name=f'Variable node error at {level}% quantile', boundary=boundary)
+
 if plot_errors:
-    Basemap_plot(data=errors_unif[0,:,:], long=long, lat=lat, name=f'KS statistic for uniform nodes at {level}% quantile', color_label='KS')
-    Basemap_plot(data=errors_unif[1,:,:], long=long, lat=lat, name=f'L_1 norm for uniform nodes at {level}% quantile', color_label='L_1 norm')
-    Basemap_plot(data=errors_unif[2,:,:], long=long, lat=lat, name=f'CRPS for uniform nodes at {level}% quantile', color_label='CRPS')
-    Basemap_plot(data=errors_var[0,:,:], long=long, lat=lat, name=f'KS statistic for variable nodes at {level}% quantile', color_label='KS')
-    Basemap_plot(data=errors_var[1,:,:], long=long, lat=lat, name=f'L_1 norm for variable nodes at {level}% quantile', color_label='L_1 norm')
-    Basemap_plot(data=errors_var[2,:,:], long=long, lat=lat, name=f'CRPS for variable nodes at {level}% quantile', color_label='CRPS')
+    Basemap_plot(data=errors_unif[0,:,:], long=long, lat=lat, name=f'KS statistic for uniform nodes', color_label='KS')
+    Basemap_plot(data=errors_unif[1,:,:], long=long, lat=lat, name=f'L_1 norm for uniform nodes', color_label='L_1 norm')
+    Basemap_plot(data=errors_unif[2,:,:], long=long, lat=lat, name=f'CRPS for uniform nodes', color_label='CRPS')
+    Basemap_plot(data=errors_var[0,:,:], long=long, lat=lat, name=f'KS statistic for variable nodes', color_label='KS')
+    Basemap_plot(data=errors_var[1,:,:], long=long, lat=lat, name=f'L_1 norm for variable nodes', color_label='L_1 norm')
+    Basemap_plot(data=errors_var[2,:,:], long=long, lat=lat, name=f'CRPS for variable nodes', color_label='CRPS')

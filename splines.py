@@ -3,8 +3,9 @@ approx_type = 'both' # 'unif', 'var', or 'both'
 include_temp = False # does not approximate temperature data yet
 error_calc = True
 save = True
-month = 'march'
-# months completed: wet, jan
+month = 'june'
+include_obs = True
+# months completed: jan, march, april, july
 
 import numpy as np
 import pygrib
@@ -26,6 +27,10 @@ elif month == 'april':
     date = '20220425'
     lead_time = '12'
     forecast_time = '018'
+elif month == 'june':
+    date = '20220626'
+    lead_time = '12'
+    forecast_time = '006'
 elif month == 'july':
     date = '20220703'
     lead_time = '00'
@@ -42,10 +47,6 @@ elif month == 'dec':
     date = '20211205'
     lead_time = '12'
     forecast_time = '018'
-elif month == 'wet':
-    date = ''
-    lead_time = '00'
-    forecast_time = '012'
 else:
     print('Issue with month input.')
 fn_grb = 'data/blend' + date + '.t' + lead_time + 'z.qmd.f' + forecast_time + '.co.grib2'
@@ -69,6 +70,12 @@ if include_temp:
         temp[i,:,:] = ds_grb.message(i+215).data()[0]
     ds_grb.close()
 
+if include_obs:
+    fn_grb = 'urma2p5.2022062612.pcp_06h.wexp.grb2'
+    ds_grb = pygrib.open(fn_grb)
+    obs = ds_grb.message(1).data()[0]
+    ds_grb.close()
+
 # masking precip at grid points that are not monotonic
 mask = np.zeros(precip.shape)
 for i in range(lat.shape[0]):
@@ -82,6 +89,8 @@ for i in range(lat.shape[0]):
                     mask[:,i,j] = np.ones(mask.shape[0])
                     
 precip = np.ma.masked_array(precip, mask)
+if include_obs:
+    obs = np.ma.masked_array(obs, mask[-1,:,:])
 
 # linear spline functions
 
@@ -152,12 +161,20 @@ def calc_errors(orig, approx):
     differences_weighted = differences * (xs[1:] - xs[:-1])
     return [differences.max(), np.sum(differences_weighted), np.sum(differences * differences_weighted)]
 
+def obs_CRPS(obs, approx):
+    xs = np.linspace(approx.min(), approx.max(), N)
+    obs_cdf = np.zeros(xs.shape[0])
+    obs_nonzero = np.where(xs >= obs)[0]
+    obs_cdf[obs_nonzero] = np.ones(obs_nonzero.shape[0])
+    return np.sum((np.interp(xs[1:], approx, qs) - obs_cdf[1:])**2 * (xs[1:] - xs[:-1]))
 
-precip_unif = np.zeros(shape=(99,)+lat.shape)
-precip_var = np.zeros(shape=(99,)+lat.shape)
+precip_unif = np.ma.masked_array(np.zeros(precip.shape), mask)
+precip_var = np.ma.masked_array(np.zeros(precip.shape), mask)
 if error_calc:
-    errors_unif = np.zeros((3,) + lat.shape)
-    errors_var = np.zeros((3,) + lat.shape)
+    errors_unif = np.ma.masked_array(np.zeros((3,) + lat.shape), [mask[-1,:,:],mask[-1,:,:],mask[-1,:,:]])
+    errors_var = np.ma.masked_array(np.zeros((3,) + lat.shape), [mask[-1,:,:],mask[-1,:,:],mask[-1,:,:]])    
+if include_obs:
+    obs_crps = np.ma.masked_array(np.zeros((2,)+lat.shape), [mask[-1,:,:],mask[-1,:,:]])
 idx = np.where(mask[-1,:,:] == 0)
 level_idxs = [4, 24, 50, 74, 94]
 
@@ -169,11 +186,13 @@ if approx_type == 'unif':
             precip_unif[:,i,j] = linear_splines_unif(data=precip[:,i,j], num_knots=10, zero_inflated=True)  
             if error_calc:
                 errors_unif[:,i,j] = calc_errors(precip[:,i,j], precip_unif[:,i,j])
-    precip_unif = np.ma.masked_array(precip_unif, mask)
-    errors_unif = np.ma.masked_array(errors_unif, [mask[-1,:,:], mask[-1,:,:], mask[-1,:,:]])
+        if include_obs:
+            obs_crps[0,i,j] = obs_CRPS(obs[i,j], precip_unif[:,i,j])
     if save:
         precip_unif[level_idxs,:,:].dump('results/precip_unif_' + month)
         errors_unif.dump('results/errors_unif_' + month)
+        if include_obs:
+            obs_crps[0,:,:].dump('results/obs_unif_crps_' + month)
 
 elif approx_type == 'var':
     for n in range(idx[0].shape[0]):
@@ -183,12 +202,14 @@ elif approx_type == 'var':
             precip_var[:,i,j] = linear_splines_var(data=precip[:,i,j], num_knots=10, zero_inflated=True) 
             if error_calc:
                 errors_var[:,i,j] = calc_errors(precip[:,i,j], precip_var[:,i,j])
-    precip_var = np.ma.masked_array(precip_var, mask)
-    errors_var = np.ma.masked_array(errors_var, [mask[-1,:,:], mask[-1,:,:], mask[-1,:,:]])
+        if include_obs:
+            obs_crps[1,i,j] = obs_CRPS(obs[i,j], precip_var[:,i,j])    
     if save:
         precip_var[level_idxs,:,:].dump('results/precip_var_' + month)
         errors_var.dump('results/errors_var_' + month)
-        
+        if include_obs:
+            obs_crps[1,:,:].dump('results/obs_var_crps_' + month)
+
 elif approx_type == 'both':
     for n in range(idx[0].shape[0]):
         i = idx[0][n]
@@ -199,16 +220,15 @@ elif approx_type == 'both':
             if error_calc:
                 errors_unif[:,i,j] = calc_errors(precip[:,i,j], precip_unif[:,i,j])
                 errors_var[:,i,j] = calc_errors(precip[:,i,j], precip_var[:,i,j])
-    precip_unif = np.ma.masked_array(precip_unif, mask)
-    precip_var = np.ma.masked_array(precip_var, mask)
-    errors_unif = np.ma.masked_array(errors_unif, [mask[-1,:,:], mask[-1,:,:], mask[-1,:,:]])
-    errors_var = np.ma.masked_array(errors_var, [mask[-1,:,:], mask[-1,:,:], mask[-1,:,:]])
+        if include_obs:
+            obs_crps[0,i,j] = obs_CRPS(obs[i,j], precip_unif[:,i,j])
+            obs_crps[1,i,j] = obs_CRPS(obs[i,j], precip_var[:,i,j])    
     if save:
         precip_unif[level_idxs,:,:].dump('results/precip_unif_' + month)
         errors_unif.dump('results/errors_unif_' + month)
         precip_var[level_idxs,:,:].dump('results/precip_var_' + month)
         errors_var.dump('results/errors_var_' + month)
-        
+        obs_crps.dump('results/obs_crps_' + month)
 
 # precip_unif = np.load('results/precip_unif_' + month, allow_pickle=True)
 # precip_var = np.load('results/precip_var_' + month, allow_pickle=True)
