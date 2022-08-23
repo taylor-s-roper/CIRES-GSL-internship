@@ -1,1 +1,1 @@
-# NOAA
+Project aim: take forecast data in the form of cumulative probability distributions at each grid point over region for precipitation and temperature variables and summarize this data using 10 or fewer data points for storage. Package QuantileCompression.py achieves this using linear splines with different approaches to fitting nodes.
